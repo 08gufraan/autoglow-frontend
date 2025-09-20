@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; color: #333; }
+        .admin-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 20px; margin-bottom: 30px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { color: #5a67d8; }
+        .logout-btn { background: linear-gradient(45deg, #ff6b6b, #ee5a24); color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: 600; transition: transform 0.2s; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 30px; }
+        .tab { background: rgba(255, 255, 255, 0.2); border: none; padding: 15px 25px; border-radius: 25px; cursor: pointer; font-weight: 600; color: white; transition: all 0.3s; }
+        .tab.active, .tab:hover { background: white; color: #5a67d8; }
+        .content { background: rgba(255, 255, 255, 0.95); border-radius: 15px; padding: 30px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); min-height: 600px; }
+        .section { display: none; }
+        .section.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .search-filter { display: flex; gap: 15px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+        .search-filter input, .search-filter select { padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; min-width: 200px; }
+        .btn { background: linear-gradient(45deg, #5a67d8, #667eea); color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: 600; }
+        .btn-secondary { background: linear-gradient(45deg, #868e96, #596168); } /* Style for refresh button */
+        .btn-danger { background: linear-gradient(45deg, #ff6b6b, #ee5a24); }
+        .table-container { overflow-x: auto; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; color: #5a67d8; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 600px; position: relative; }
+        .close { position: absolute; right: 15px; top: 10px; font-size: 28px; cursor: pointer; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; }
+        .alert { padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="header">
+            <h1>Admin Dashboard</h1>
+            <div>
+                <span id="adminName">Welcome, Admin</span>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('appointments')">Appointments</button>
+            <button class="tab" onclick="switchTab('services')">Services</button>
+            <button class="tab" onclick="switchTab('users')">Users</button>
+        </div>
+
+        <div class="content">
+            <div id="globalAlert" class="alert alert-success" style="display: none;"></div>
+            <div id="appointments" class="section active">
+                <h2>Appointment Management</h2>
+                <div class="search-filter">
+                    <input type="text" id="appointmentSearch" placeholder="Search by ID, Name...">
+                    <select id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="in-process">In Process</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    <button class="btn" onclick="exportBookings()">Export to CSV</button>
+                    <button class="btn btn-secondary" onclick="refreshActiveTabData()">🔄 Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table id="appointmentsTable">
+                        <thead>
+                            <tr>
+                                <th>Booking ID</th><th>Client</th><th>Service</th><th>Date & Time</th><th>Status</th><th>Driver</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appointmentsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="services" class="section">
+                <h2>Service Management</h2>
+                <div class="search-filter">
+                    <button class="btn" onclick="openServiceModal()">Add New Service</button>
+                    <button class="btn btn-secondary" onclick="refreshActiveTabData()">🔄 Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table id="servicesTable">
+                        <thead>
+                            <tr><th>Vehicle</th><th>Service Name</th><th>Price</th><th>Duration (min)</th><th>Status</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="servicesTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="users" class="section">
+                <h2>User Management</h2>
+                 <div class="search-filter">
+                    <button class="btn btn-secondary" onclick="refreshActiveTabData()">🔄 Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table id="usersTable">
+                        <thead>
+                            <tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th></tr>
+                        </thead>
+                        <tbody id="usersTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="serviceModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeServiceModal()">&times;</span>
+            <h2 id="serviceModalTitle">Add Service</h2>
+            <form id="serviceForm">
+                <input type="hidden" id="serviceId">
+                <div class="form-group"><label>Vehicle Type</label><select id="vehicleType" required><option value="car">Car</option><option value="suv">SUV</option><option value="motorcycle">Motorcycle</option><option value="truck">Truck</option></select></div>
+                <div class="form-group"><label>Service Name</label><input type="text" id="serviceName" required></div>
+                <div class="form-group"><label>Description</label><textarea id="serviceDescription" rows="3"></textarea></div>
+                <div class="form-group"><label>Price (₹)</label><input type="number" id="servicePrice" step="0.01" required></div>
+                <div class="form-group"><label>Duration (minutes)</label><input type="number" id="serviceDuration" required></div>
+                <div class="form-group"><label>Status</label><select id="serviceStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+                <button type="submit" class="btn">Save Service</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api';
+        const authToken = localStorage.getItem('authToken');
+        let currentUser;
+
+        // --- AUTH & INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!authToken) {
+                window.location.href = '/adminlogin.html';
+                return;
+            }
+            currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            if (!currentUser || currentUser.role !== 'admin') {
+                alert('Access Denied. Admin role required.');
+                window.location.href = '/adminlogin.html';
+                return;
+            }
+            document.getElementById('adminName').textContent = `Welcome, ${currentUser.name}`;
+            switchTab('appointments');
+            document.getElementById('serviceForm').addEventListener('submit', handleServiceFormSubmit);
+        });
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/adminlogin.html';
+        }
+
+        async function apiFetch(endpoint, options = {}) {
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' };
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+            if (!response.ok) throw new Error('API request failed');
+            return response.json();
+        }
+
+        function showAlert(message) {
+            const alertEl = document.getElementById('globalAlert');
+            alertEl.textContent = message;
+            alertEl.style.display = 'block';
+            setTimeout(() => alertEl.style.display = 'none', 4000);
+        }
+
+        // --- REFRESH FUNCTION ADDED HERE ---
+        function refreshActiveTabData() {
+            const activeTab = document.querySelector('.section.active');
+            if (!activeTab) return;
+
+            // Find the corresponding data loading function and call it
+            switch (activeTab.id) {
+                case 'appointments':
+                    loadAppointments();
+                    break;
+                case 'services':
+                    loadServices();
+                    break;
+                case 'users':
+                    loadUsers();
+                    break;
+            }
+            showAlert('Data refreshed successfully!');
+        }
+
+        // --- TAB SWITCHING ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab, .section').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+
+            // Load data for the activated tab
+            if (tabName === 'appointments') loadAppointments();
+            if (tabName === 'services') loadServices();
+            if (tabName === 'users') loadUsers();
+        }
+
+        // --- APPOINTMENTS ---
+        async function loadAppointments() {
+            const bookings = await apiFetch('/admin/bookings');
+            const tbody = document.getElementById('appointmentsTableBody');
+            tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>'; // Loading indicator
+            tbody.innerHTML = '';
+            bookings.forEach(b => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${b.booking_id}</td><td>${b.user_name}</td>
+                    <td>${b.vehicle_type} - ${b.service_type}</td>
+                    <td>${new Date(b.booking_date).toLocaleDateString()} ${b.booking_time}</td>
+                    <td><select onchange="updateBookingStatus(${b.id}, this.value)">
+                        <option value="pending" ${b.status === 'pending' ? 'selected' : ''}>Pending</option>
+                        <option value="in-process" ${b.status === 'in-process' ? 'selected' : ''}>In Process</option>
+                        <option value="completed" ${b.status === 'completed' ? 'selected' : ''}>Completed</option>
+                        <option value="cancelled" ${b.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                    </select></td>
+                    <td>${b.driver_name || 'N/A'}</td>`;
+            });
+        }
+        
+        async function updateBookingStatus(id, status) {
+            try {
+                await apiFetch(`/admin/bookings/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+                showAlert('Booking status updated successfully!');
+            } catch (e) {
+                showAlert('Failed to update status.');
+            }
+        }
+        
+        function exportBookings() {
+            // Using a direct link which the browser will handle as a download
+            window.location.href = `${API_BASE_URL}/admin/bookings/export`;
+        }
+
+
+        // --- SERVICES ---
+        async function loadServices() {
+            const services = await apiFetch('/admin/services');
+            const tbody = document.getElementById('servicesTableBody');
+            tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>'; // Loading indicator
+            tbody.innerHTML = '';
+            services.forEach(s => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${s.vehicle_type}</td><td>${s.service_name}</td>
+                    <td>₹${s.price}</td><td>${s.duration}</td><td>${s.status}</td>
+                    <td>
+                        <button onclick='openServiceModal(${JSON.stringify(s)})'>Edit</button>
+                        <button class='btn-danger' onclick='deleteService(${s.id})'>Delete</button>
+                    </td>`;
+            });
+        }
+
+        function openServiceModal(service = null) {
+            const modal = document.getElementById('serviceModal');
+            document.getElementById('serviceForm').reset();
+            if (service) {
+                document.getElementById('serviceModalTitle').textContent = 'Edit Service';
+                document.getElementById('serviceId').value = service.id;
+                document.getElementById('vehicleType').value = service.vehicle_type;
+                document.getElementById('serviceName').value = service.service_name;
+                document.getElementById('serviceDescription').value = service.description;
+                document.getElementById('servicePrice').value = service.price;
+                document.getElementById('serviceDuration').value = service.duration;
+                document.getElementById('serviceStatus').value = service.status;
+            } else {
+                document.getElementById('serviceModalTitle').textContent = 'Add Service';
+                document.getElementById('serviceId').value = '';
+            }
+            modal.style.display = 'flex';
+        }
+
+        function closeServiceModal() {
+            document.getElementById('serviceModal').style.display = 'none';
+        }
+
+        async function handleServiceFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('serviceId').value;
+            const serviceData = {
+                vehicle_type: document.getElementById('vehicleType').value,
+                service_name: document.getElementById('serviceName').value,
+                description: document.getElementById('serviceDescription').value,
+                price: parseFloat(document.getElementById('servicePrice').value),
+                duration: parseInt(document.getElementById('serviceDuration').value),
+                status: document.getElementById('serviceStatus').value,
+            };
+
+            try {
+                if (id) {
+                    await apiFetch(`/admin/services/${id}`, { method: 'PUT', body: JSON.stringify(serviceData) });
+                    showAlert('Service updated successfully!');
+                } else {
+                    await apiFetch('/admin/services', { method: 'POST', body: JSON.stringify(serviceData) });
+                    showAlert('Service added successfully!');
+                }
+                closeServiceModal();
+                loadServices();
+            } catch (err) {
+                showAlert('Failed to save service.');
+            }
+        }
+        
+        async function deleteService(id) {
+            if (!confirm('Are you sure you want to delete this service?')) return;
+            try {
+                await apiFetch(`/admin/services/${id}`, { method: 'DELETE' });
+                showAlert('Service deleted.');
+                loadServices();
+            } catch (err) {
+                showAlert('Failed to delete service.');
+            }
+        }
+
+        // --- USERS ---
+        async function loadUsers() {
+            const users = await apiFetch('/admin/users');
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>'; // Loading indicator
+            tbody.innerHTML = '';
+            users.forEach(u => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${u.id}</td><td>${u.name}</td><td>${u.email}</td>
+                    <td>${u.phone}</td><td>${u.role}</td><td>${u.status}</td>`;
+            });
+        }
+    </script>
+</body>
+</html>

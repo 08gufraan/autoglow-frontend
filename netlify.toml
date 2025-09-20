@@ -1,0 +1,9 @@
+[build]
+  publish = "."
+  command = ""
+
+# Handle Single Page App (SPA) routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

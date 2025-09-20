@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoGlow - Driver Panel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; color: #333; }
+        .driver-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { color: #5a67d8; }
+        .logout-btn { background: linear-gradient(45deg, #ff6b6b, #ee5a24); color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: 600; }
+        .quick-actions { background: rgba(255, 255, 255, 0.95); border-radius: 15px; padding: 20px; margin-bottom: 30px; }
+        .quick-actions h2 { color: #5a67d8; margin-bottom: 20px; text-align: center; }
+        .status-update-form { display: grid; grid-template-columns: 2fr 1fr auto; gap: 15px; align-items: end; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 5px; font-weight: 600; }
+        .form-group input, .form-group select { padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; }
+        .btn { background: linear-gradient(45deg, #5a67d8, #667eea); color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: 600; }
+        .content { background: rgba(255, 255, 255, 0.95); border-radius: 15px; padding: 30px; }
+        .booking-card { background: white; border-radius: 15px; padding: 20px; margin-bottom: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); border-left: 5px solid #5a67d8; }
+        .booking-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .booking-id { font-size: 1.2em; font-weight: bold; color: #5a67d8; }
+        .status-badge { padding: 5px 15px; border-radius: 20px; font-weight: 600; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-in-process { background: #cce5ff; color: #004085; }
+        .status-completed { background: #d4edda; color: #155724; }
+        .status-cancelled { background: #f8d7da; color: #721c24; }
+        .booking-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .booking-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
+        .alert { padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="driver-container">
+        <div class="header">
+            <h1>Driver Panel</h1>
+            <div>
+                <span id="driverName">Welcome, Driver</span>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <h2>Quick Status Update</h2>
+            <div id="globalAlert" class="alert alert-success" style="display:none;"></div>
+            <div class="status-update-form">
+                <div class="form-group">
+                    <label for="quickBookingId">Booking ID</label>
+                    <input type="text" id="quickBookingId" placeholder="Enter Booking ID (e.g., AG123456)">
+                </div>
+                <div class="form-group">
+                    <label for="quickStatus">Status</label>
+                    <select id="quickStatus">
+                        <option value="in-process">In Process</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="quickUpdateStatus()">Update</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <h2>My Bookings</h2>
+            <div id="bookingsList">
+                <p>Loading bookings...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api';
+        const authToken = localStorage.getItem('authToken');
+        let currentUser;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!authToken) {
+                window.location.href = '/adminlogin.html';
+                return;
+            }
+            currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            if (!currentUser || !['driver', 'admin'].includes(currentUser.role)) {
+                alert('Access Denied. Driver role required.');
+                window.location.href = '/adminlogin.html';
+                return;
+            }
+            document.getElementById('driverName').textContent = `Welcome, ${currentUser.name}`;
+            loadBookings();
+        });
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/adminlogin.html';
+        }
+        
+        async function apiFetch(endpoint, options = {}) {
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' };
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+            if (!response.ok) throw new Error('API request failed');
+            return response.json();
+        }
+
+        function showAlert(message) {
+            const alertEl = document.getElementById('globalAlert');
+            alertEl.textContent = message;
+            alertEl.style.display = 'block';
+            setTimeout(() => alertEl.style.display = 'none', 4000);
+        }
+
+        async function loadBookings() {
+            const listEl = document.getElementById('bookingsList');
+            try {
+                const data = await apiFetch('/driver/bookings');
+                if (data.success && data.bookings.length > 0) {
+                    listEl.innerHTML = data.bookings.map(createBookingCard).join('');
+                } else {
+                    listEl.innerHTML = '<p>No active bookings assigned to you.</p>';
+                }
+            } catch (e) {
+                listEl.innerHTML = '<p>Failed to load bookings.</p>';
+            }
+        }
+        
+        function createBookingCard(b) {
+            // const response = await fetch(`${API_BASE_URL}/service-prices`);
+            // const data = await response.json();
+            const actions = `
+                ${b.status === 'pending' ? `<button class="btn" onclick="updateBookingStatus('${b.booking_id}', 'in-process')">Start Job</button>` : ''}
+                ${b.status === 'in-process' ? `<button class="btn" onclick="updateBookingStatus('${b.booking_id}', 'completed')">Mark Complete</button>` : ''}
+                ${b.status !== 'completed' && b.status !== 'cancelled' ? `<button class="btn btn-danger" onclick="updateBookingStatus('${b.booking_id}', 'cancelled')">Cancel</button>`: ''}`;
+            
+            return `
+            <div class="booking-card">
+                <div class="booking-header">
+                    <div class="booking-id">${b.booking_id}</div>
+                    <div class="status-badge status-${b.status}">${b.status}</div>
+                </div>
+                <div class="booking-details">
+                    <div><strong>Customer:</strong> ${b.user_name}</div>
+                    <div><strong>Phone:</strong> ${b.user_phone}</div>
+                    <div><strong>Service:</strong> ${b.vehicle_type} - ${b.service_type}</div>
+                    <div><strong>Price:</strong> ${b.total_price}</div>
+
+                    <div><strong>Date:</strong> ${new Date(b.booking_date).toLocaleDateString()} at ${b.booking_time}</div>
+                    <div><strong>Location:</strong> ${b.pickup_location}</div>
+                </div>
+                <div class="booking-actions">${actions}</div>
+            </div>`;
+        }
+        
+        async function quickUpdateStatus() {
+            const booking_id = document.getElementById('quickBookingId').value;
+            const status = document.getElementById('quickStatus').value;
+            if (!booking_id) {
+                return showAlert('Please enter a booking ID.');
+            }
+            await updateBookingStatus(booking_id, status);
+        }
+
+        async function updateBookingStatus(booking_id, status) {
+            try {
+                const response = await apiFetch('/driver/booking-status', {
+                    method: 'PUT',
+                    body: JSON.stringify({ booking_id, status })
+                });
+                if (response.success) {
+                    showAlert('Status updated successfully!');
+                    loadBookings();
+                } else {
+                    showAlert(response.message || 'Update failed.');
+                }
+            } catch (e) {
+                showAlert('Failed to update status.');
+            }
+        }
+    </script>
+</body>
+</html>

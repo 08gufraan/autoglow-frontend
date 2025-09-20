@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Portal - AutoGlow</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea, #764ba2); }
+        .portal-container { background: white; padding: 2rem 3rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 100%; max-width: 450px; }
+        h2 { text-align: center; color: #333; margin-bottom: 0.5rem; }
+        .tabs { display: flex; border-bottom: 2px solid #f0f0f0; margin-bottom: 1.5rem; }
+        .tab-btn { flex: 1; padding: 1rem; border: none; background: none; cursor: pointer; font-size: 1rem; font-weight: 500; color: #999; transition: all 0.3s ease; }
+        .tab-btn.active { color: #667eea; border-bottom: 2px solid #667eea; }
+        .form-content { display: none; }
+        .form-content.active { display: block; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #555; }
+        .form-group input, .form-group select { width: 100%; padding: 0.8rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; transition: border-color 0.3s ease; }
+        .form-group input:focus { outline: none; border-color: #667eea; }
+        .btn { padding: 0.8rem 1.5rem; border: none; border-radius: 25px; cursor: pointer; font-weight: 500; width: 100%; background: linear-gradient(45deg, #667eea, #764ba2); color: white; font-size: 1.1rem; transition: all 0.3s ease; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .otp-section { display: none; }
+        .alert { padding: 1rem; margin-top: 1rem; border-radius: 8px; text-align: center; }
+        .alert-error { background: #f8d7da; color: #721c24; }
+        .alert-success { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="portal-container">
+        <h2>Staff Portal</h2>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+            <button class="tab-btn" onclick="switchTab('signup')">Sign Up</button>
+        </div>
+
+        <div id="login" class="form-content active">
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <button type="submit" class="btn">Login</button>
+            </form>
+            <div id="loginAlert" class="alert" style="display: none;"></div>
+        </div>
+
+        <div id="signup" class="form-content">
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="signupName">Full Name</label>
+                    <input type="text" id="signupName" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email</label>
+                    <input type="email" id="signupEmail" required>
+                </div>
+                <button type="button" class="btn" onclick="sendOTP()" id="sendOtpBtn" style="margin-bottom: 1rem;">Send OTP</button>
+                <div class="otp-section" id="otpSection">
+                    <div class="form-group">
+                        <label for="otpInput">Enter OTP</label>
+                        <input type="text" id="otpInput" maxlength="6" placeholder="000000">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="signupPhone">Phone Number</label>
+                    <input type="tel" id="signupPhone" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupRole">Role</label>
+                    <select id="signupRole" required>
+                        <option value="driver">Driver</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Create Account</button>
+            </form>
+            <div id="signupAlert" class="alert" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api';
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn, .form-content').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.tab-btn[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        function showAlert(alertId, message, isError = true) {
+            const el = document.getElementById(alertId);
+            el.textContent = message;
+            el.className = `alert ${isError ? 'alert-error' : 'alert-success'}`;
+            el.style.display = 'block';
+        }
+        
+        async function sendOTP() {
+            const email = document.getElementById('signupEmail').value;
+            if (!email) {
+                showAlert('signupAlert', 'Please enter your email first.');
+                return;
+            }
+            const btn = document.getElementById('sendOtpBtn');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/send-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showAlert('signupAlert', 'OTP sent to your email!', false);
+                    document.getElementById('otpSection').style.display = 'block';
+                    btn.textContent = 'OTP Sent';
+                } else {
+                    showAlert('signupAlert', data.message);
+                    btn.disabled = false;
+                    btn.textContent = 'Send OTP';
+                }
+            } catch (error) {
+                showAlert('signupAlert', 'Failed to send OTP.');
+                btn.disabled = false;
+                btn.textContent = 'Send OTP';
+            }
+        }
+
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = {
+                name: this.signupName.value,
+                email: this.signupEmail.value,
+                phone: this.signupPhone.value,
+                password: this.signupPassword.value,
+                otp: this.otpInput.value,
+                role: this.signupRole.value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/staff/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+                if (data.success) {
+                    handleSuccessfulAuth(data);
+                } else {
+                    showAlert('signupAlert', data.message);
+                }
+            } catch (error) {
+                showAlert('signupAlert', 'Registration failed.');
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = {
+                email: this.loginEmail.value,
+                password: this.loginPassword.value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+                if (data.success && ['admin', 'driver'].includes(data.user.role)) {
+                    handleSuccessfulAuth(data);
+                } else {
+                    showAlert('loginAlert', data.message || 'Invalid credentials or role.');
+                }
+            } catch (error) {
+                showAlert('loginAlert', 'Login failed.');
+            }
+        });
+
+        function handleSuccessfulAuth(data) {
+            localStorage.setItem('authToken', data.token);
+            localStorage.setItem('currentUser', JSON.stringify(data.user));
+            
+            // Redirect based on role
+            if (data.user.role === 'admin') {
+                window.location.href = '/admin.html';
+            } else if (data.user.role === 'driver') {
+                window.location.href = '/driver.html';
+            } else {
+                 showAlert('loginAlert', 'Your role does not have access to this portal.');
+            }
+        }
+    </script>
+</body>
+</html>
